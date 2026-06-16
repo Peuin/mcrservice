@@ -59,3 +59,10 @@ node_modules/
 .secret-*
 **.sample
 #amplify-do-not-edit-end
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+**/secret.yaml
+apps/worker-service/k8s/secret.yaml
