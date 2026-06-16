@@ -1,0 +1,189 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: peuin
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: peuin/auth-service:latest
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: peuin-config
+            - secretRef:
+                name: peuin-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: peuin
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 80
+      targetPort: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: peuin
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+        - name: user-service
+          image: peuin/user-service:latest
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: peuin-config
+            - secretRef:
+                name: peuin-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: peuin
+spec:
+  selector:
+    app: user-service
+  ports:
+    - port: 80
+      targetPort: 8082
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feed-service
+  namespace: peuin
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: feed-service
+  template:
+    metadata:
+      labels:
+        app: feed-service
+    spec:
+      containers:
+        - name: feed-service
+          image: peuin/feed-service:latest
+          ports:
+            - containerPort: 8083
+          envFrom:
+            - configMapRef:
+                name: peuin-config
+            - secretRef:
+                name: peuin-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: feed-service
+  namespace: peuin
+spec:
+  selector:
+    app: feed-service
+  ports:
+    - port: 80
+      targetPort: 8083
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-service
+  namespace: peuin
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: search-service
+  template:
+    metadata:
+      labels:
+        app: search-service
+    spec:
+      containers:
+        - name: search-service
+          image: peuin/search-service:latest
+          ports:
+            - containerPort: 8084
+          envFrom:
+            - configMapRef:
+                name: peuin-config
+            - secretRef:
+                name: peuin-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-service
+  namespace: peuin
+spec:
+  selector:
+    app: search-service
+  ports:
+    - port: 80
+      targetPort: 8084
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-service
+  namespace: peuin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-service
+  template:
+    metadata:
+      labels:
+        app: worker-service
+    spec:
+      containers:
+        - name: worker-service
+          image: peuin/worker-service:latest
+          ports:
+            - containerPort: 8085
+          envFrom:
+            - configMapRef:
+                name: peuin-config
+            - secretRef:
+                name: peuin-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker-service
+  namespace: peuin
+spec:
+  selector:
+    app: worker-service
+  ports:
+    - port: 80
+      targetPort: 8085

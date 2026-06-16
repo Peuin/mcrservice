@@ -1,0 +1,24 @@
+server:
+  port: ${PORT:8081}
+spring:
+  application:
+    name: auth-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+peuin:
+  supabase:
+    url: ${SUPABASE_URL}
+    anon-key: ${SUPABASE_ANON_KEY:}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY}
+  otp:
+    hash-secret: ${OTP_HASH_SECRET:${SUPABASE_SERVICE_ROLE_KEY}}
+    ttl-minutes: ${OTP_TTL_MINUTES:10}
+    max-attempts: ${OTP_MAX_ATTEMPTS:5}
+    min-password-length: ${PASSWORD_MIN_LENGTH:8}
+  resend:
+    api-key: ${RESEND_API_KEY:}
+    from-email: ${RESEND_FROM_EMAIL:Peuin <onboarding@resend.dev>}
+    reply-to: ${RESEND_REPLY_TO:}

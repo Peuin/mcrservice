@@ -1,0 +1,17 @@
+server:
+  port: ${PORT:8082}
+spring:
+  application:
+    name: user-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+peuin:
+  supabase:
+    url: ${SUPABASE_URL}
+    anon-key: ${SUPABASE_ANON_KEY}
+  gemini:
+    api-key: ${GEMINI_API_KEY:${GOOGLE_API_KEY:}}
+    model: ${GEMINI_MODEL:gemini-1.5-flash}

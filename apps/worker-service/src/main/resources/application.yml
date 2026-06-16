@@ -1,0 +1,24 @@
+server:
+  port: ${PORT:8085}
+spring:
+  application:
+    name: worker-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+peuin:
+  supabase:
+    url: ${SUPABASE_URL}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY}
+  workers:
+    home-feed-secret: ${HOME_FEED_WARM_SECRET:}
+    app-search-secret: ${APP_SEARCH_WARM_SECRET:}
+    home-feed-viewer-limit: ${HOME_FEED_WARM_VIEWER_LIMIT:200}
+    app-search-limit: ${APP_SEARCH_WARM_LIMIT:12}
+    app-search-posts-limit: ${APP_SEARCH_WARM_POSTS_LIMIT:20}
+    app-search-queries: ${APP_SEARCH_WARM_QUERIES:pho,coffee,bun,banh mi}
+  upstash:
+    redis-url: ${UPSTASH_REDIS_REST_URL:}
+    redis-token: ${UPSTASH_REDIS_REST_TOKEN:}

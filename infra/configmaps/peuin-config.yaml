@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: peuin-config
+  namespace: peuin
+data:
+  OTP_TTL_MINUTES: "10"
+  OTP_MAX_ATTEMPTS: "5"
+  PASSWORD_MIN_LENGTH: "8"
+  GEMINI_MODEL: "gemini-1.5-flash"
+  BUNNY_STORAGE_HOST: "storage.bunnycdn.com"
+  BUNNY_STORY_STORAGE_PREFIX: "stories"
+  HOME_FEED_WARM_VIEWER_LIMIT: "200"
+  APP_SEARCH_WARM_LIMIT: "12"
+  APP_SEARCH_WARM_POSTS_LIMIT: "20"
+  APP_SEARCH_WARM_QUERIES: "pho,coffee,bun,banh mi"
+  SEARCH_VECTOR_BUCKET: "app-search"
+  SEARCH_VECTOR_DIMENSION: "1536"
+  SEARCH_VECTOR_DISTANCE_METRIC: "cosine"

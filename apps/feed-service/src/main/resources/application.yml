@@ -1,0 +1,17 @@
+server:
+  port: ${PORT:8083}
+spring:
+  application:
+    name: feed-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+peuin:
+  supabase:
+    url: ${SUPABASE_URL}
+    anon-key: ${SUPABASE_ANON_KEY}
+  upstash:
+    redis-url: ${UPSTASH_REDIS_REST_URL:}
+    redis-token: ${UPSTASH_REDIS_REST_TOKEN:}
