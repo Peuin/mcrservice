@@ -1,11 +1,18 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
-WORKDIR /workspace
+
+WORKDIR /app
+
 COPY pom.xml .
-COPY apps/worker-service apps/worker-service
-RUN mvn -pl apps/worker-service -am -DskipTests package
+COPY src ./src
+
+RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:21-jre
+
 WORKDIR /app
-COPY --from=build /workspace/apps/worker-service/target/worker-service-*.jar app.jar
-EXPOSE 8085
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
+COPY --from=build /app/target/*.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
