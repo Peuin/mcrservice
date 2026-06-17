@@ -1,10 +1,10 @@
-# Chạy từ root project (cần file .env cùng thư mục).
+# Chạy từ root project. Mỗi service load .env riêng trong apps/<service>/.env
 #
 #   docker compose up auth-service
 #   docker compose up --build
-#   docker compose up -d worker-service auth-service
 #
-# Mỗi service tự load biến môi trường từ .env qua env_file.
+# Không chạy image trực tiếp trên Docker Desktop (Run) — sẽ thiếu env.
+# Dùng Compose hoặc: docker run --env-file apps/auth-service/.env ...
 
 services:
   auth-service:
@@ -15,7 +15,7 @@ services:
     ports:
       - "8081:8081"
     env_file:
-      - .env
+      - apps/auth-service/.env
     environment:
       PORT: "8081"
 
@@ -27,7 +27,7 @@ services:
     ports:
       - "8082:8082"
     env_file:
-      - .env
+      - apps/user-service/.env
     environment:
       PORT: "8082"
 
@@ -39,7 +39,7 @@ services:
     ports:
       - "8083:8083"
     env_file:
-      - .env
+      - apps/feed-service/.env
     environment:
       PORT: "8083"
 
@@ -51,7 +51,7 @@ services:
     ports:
       - "8084:8084"
     env_file:
-      - .env
+      - apps/search-service/.env
     environment:
       PORT: "8084"
 
@@ -63,6 +63,6 @@ services:
     ports:
       - "8085:8085"
     env_file:
-      - .env
+      - apps/worker-service/.env
     environment:
       PORT: "8085"
