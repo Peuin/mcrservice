@@ -26,7 +26,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: auth-service-config
-            
           resources:
             requests:
               cpu: 100m
