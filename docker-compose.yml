@@ -1,0 +1,68 @@
+# Chạy từ root project (cần file .env cùng thư mục).
+#
+#   docker compose up auth-service
+#   docker compose up --build
+#   docker compose up -d worker-service auth-service
+#
+# Mỗi service tự load biến môi trường từ .env qua env_file.
+
+services:
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    image: mcrservice/auth-service:0.1.0
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    environment:
+      PORT: "8081"
+
+  user-service:
+    build:
+      context: .
+      dockerfile: apps/user-service/Dockerfile
+    image: mcrservice/user-service:0.1.0
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    environment:
+      PORT: "8082"
+
+  feed-service:
+    build:
+      context: .
+      dockerfile: apps/feed-service/Dockerfile
+    image: mcrservice/feed-service:0.1.0
+    ports:
+      - "8083:8083"
+    env_file:
+      - .env
+    environment:
+      PORT: "8083"
+
+  search-service:
+    build:
+      context: .
+      dockerfile: apps/search-service/Dockerfile
+    image: mcrservice/search-service:0.1.0
+    ports:
+      - "8084:8084"
+    env_file:
+      - .env
+    environment:
+      PORT: "8084"
+
+  worker-service:
+    build:
+      context: .
+      dockerfile: apps/worker-service/Dockerfile
+    image: mcrservice/worker-service:0.1.0
+    ports:
+      - "8085:8085"
+    env_file:
+      - .env
+    environment:
+      PORT: "8085"

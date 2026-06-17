@@ -1,11 +1,20 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
-WORKDIR /workspace
+
+WORKDIR /app
+
 COPY pom.xml .
-COPY apps/search-service apps/search-service
-RUN mvn -pl apps/search-service -am -DskipTests package
+COPY apps ./apps
+
+RUN mvn -pl apps/search-service -am clean package spring-boot:repackage -DskipTests
+
+RUN find apps/search-service/target -name "*.jar" ! -name "original-*.jar" -exec cp {} /tmp/app.jar \;
 
 FROM eclipse-temurin:21-jre
+
 WORKDIR /app
-COPY --from=build /workspace/apps/search-service/target/search-service-*.jar app.jar
+
+COPY --from=build /tmp/app.jar app.jar
+
 EXPOSE 8084
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
