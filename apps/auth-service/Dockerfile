@@ -1,11 +1,20 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
-WORKDIR /workspace
+
+WORKDIR /app
+
 COPY pom.xml .
-COPY apps/auth-service apps/auth-service
-RUN mvn -pl apps/auth-service -am -DskipTests package
+COPY apps ./apps
+
+RUN mvn -pl apps/auth-service -am clean package spring-boot:repackage -DskipTests
+
+RUN find apps/auth-service/target -name "*.jar" ! -name "original-*.jar" -exec cp {} /tmp/app.jar \;
 
 FROM eclipse-temurin:21-jre
+
 WORKDIR /app
-COPY --from=build /workspace/apps/auth-service/target/auth-service-*.jar app.jar
+
+COPY --from=build /tmp/app.jar app.jar
+
 EXPOSE 8081
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
