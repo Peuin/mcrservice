@@ -15,9 +15,11 @@ spec:
       labels:
         app: auth-service
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: auth-service
-          image: ghcr.io/peuin/auth-service:latest
+          image: ghcr.io/nquynh2011199/auth-service:0.1.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8081
