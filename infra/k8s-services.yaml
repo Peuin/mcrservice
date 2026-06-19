@@ -5,6 +5,11 @@ metadata:
   namespace: peuin
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: mcrservice
@@ -18,6 +23,7 @@ spec:
       containers:
         - name: mcrservice
           image: ghcr.io/peuin/mcrservice:20260619-1647-audit-amd64
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 8080
@@ -30,10 +36,14 @@ spec:
             httpGet:
               path: /health
               port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /health
               port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
           resources:
             requests:
               cpu: 100m
