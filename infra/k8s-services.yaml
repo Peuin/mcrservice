@@ -20,6 +20,7 @@ spec:
       labels:
         app: mcrservice
     spec:
+      terminationGracePeriodSeconds: 30
       imagePullSecrets:
         - name: ghcr-secret
       containers:
