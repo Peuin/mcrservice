@@ -85,7 +85,7 @@ function normalizeSignupError(error: unknown) {
   const code = value.code?.toLowerCase() ?? "";
   const message = value.message?.toLowerCase() ?? "";
 
-  if (code === "user_already_exists" || message.includes("already registered") || message.includes("already exists")) {
+  if (code === "user_already_exists" || code === "email_exists" || message.includes("already registered") || message.includes("already exists")) {
     return new SignupError("EMAIL_ALREADY_EXISTS", "Email đã được đăng ký.", 409);
   }
   if (code === "weak_password" || message.includes("password") && (message.includes("weak") || message.includes("characters"))) {
@@ -104,12 +104,24 @@ function normalizeSignupError(error: unknown) {
 }
 
 export async function signup(email: string, password: string) {
+  const normalizedEmail = email.toLowerCase();
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
   try {
-    const { data, error } = await client.auth.signUp({ email: email.toLowerCase(), password });
+    const { error: createError } = await requireAdmin().auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true
+    });
+    if (createError) throw createError;
+
+    const { data, error } = await client.auth.signInWithPassword({
+      email: normalizedEmail,
+      password
+    });
     if (error) throw error;
+
     return {
       user: data.user ? { id: data.user.id, email: data.user.email ?? null } : null,
       session: data.session ? {
@@ -117,7 +129,7 @@ export async function signup(email: string, password: string) {
         refresh_token: data.session.refresh_token,
         expires_in: data.session.expires_in
       } : null,
-      requiresEmailConfirmation: data.session === null
+      requiresEmailConfirmation: false
     };
   } catch (error) {
     if (error instanceof SignupError) throw error;
