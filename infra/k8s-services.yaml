@@ -9,6 +9,7 @@ spec:
   progressDeadlineSeconds: 600
   strategy:
     type: RollingUpdate
+
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
@@ -76,3 +77,24 @@ spec:
     - name: http
       port: 80
       targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcrservice-ingress
+  namespace: peuin
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: mcrservice.peuinjournal.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mcrservice
+                port:
+                  number: 80
