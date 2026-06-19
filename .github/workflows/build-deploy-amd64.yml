@@ -1,0 +1,84 @@
+name: Build and deploy mcrservice AMD64
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - "Dockerfile"
+      - ".github/workflows/build-deploy-amd64.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: mcrservice-amd64-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/peuin/mcrservice
+
+jobs:
+  build-and-update-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set immutable image tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA}-amd64" >> "$GITHUB_ENV"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate application
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push linux/amd64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update GitOps image tag
+        env:
+          IMAGE: ${{ env.IMAGE_REPOSITORY }}:${{ env.IMAGE_TAG }}
+        run: |
+          sed -i "s|image: ghcr.io/peuin/mcrservice:.*|image: ${IMAGE}|" infra/k8s-services.yaml
+          grep -F "image: ${IMAGE}" infra/k8s-services.yaml
+
+      - name: Commit deployment revision
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add infra/k8s-services.yaml
+          git commit -m "deploy: mcrservice ${IMAGE_TAG} [skip ci]"
+          git push origin HEAD:main
