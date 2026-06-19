@@ -1,5 +1,45 @@
 # Deploy mcrservice lên K3s với Argo CD
 
+## Quy trình hiện tại — Fastify mcrservice, VPS AMD64
+
+Image đã build và push:
+
+```text
+ghcr.io/peuin/mcrservice:20260619-1647-audit-amd64
+```
+
+Build một phiên bản mới từ máy ARM64 nhưng chạy trên VPS AMD64:
+
+```bash
+cd /path/to/mcrservice
+export IMAGE_TAG="$(date -u +%Y%m%d-%H%M)-amd64"
+export GITHUB_USER="peuin"
+export GITHUB_TOKEN="<PAT có write:packages>"
+bash scripts/ghcr-login-push.sh
+```
+
+Sau khi script xác nhận registry có `linux/amd64`:
+
+1. Đổi `image:` trong `infra/k8s-services.yaml` sang tag mới.
+2. Commit và push thay đổi manifest lên nhánh `main` của `Peuin/mcrservice`.
+3. Cài Application lần đầu: `kubectl apply -f argocd/mcrservice-app.yaml`.
+4. Argo CD tự sync; hoặc chạy `argocd app sync mcrservice`.
+5. Kiểm tra:
+
+   ```bash
+   kubectl get application mcrservice -n argocd
+   kubectl rollout status deployment/mcrservice -n peuin
+   kubectl get pods -n peuin -l app=mcrservice
+   kubectl get deployment mcrservice -n peuin \
+     -o jsonpath='{.spec.template.spec.containers[0].image}'
+   ```
+
+Nếu GHCR package private, tạo `ghcr-secret` trong namespace `peuin` bằng PAT có
+`read:packages`. Secret runtime `peuin-secrets` cũng phải tồn tại trước khi sync.
+
+> Các phần `auth-service`/`worker-service` bên dưới là tài liệu legacy trước khi
+> backend được hợp nhất thành Fastify `mcrservice`.
+
 Hướng dẫn deploy `auth-service`, `worker-service` và các service khác lên K3s. Image được build và push từ local hoặc CI; VPS chỉ pull image và sync manifest từ Git.
 
 > **Lỗi thường gặp:** `ghcr.io/peuin/auth-service:latest` → `403 Forbidden`  

@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+!.env.local.example
+!.env.production.example
 
 # Kubernetes secrets (real)
 **/secret.yaml
@@ -10,11 +12,10 @@ infra/secrets/*-secret.yaml
 !infra/secrets/*.example.yaml
 !**/secret.example.yaml
 
-# Maven / Java
-target/
-*.class
-*.jar
-*.war
+# Node.js / TypeScript
+node_modules/
+dist/
+coverage/
 *.log
 
 # IDE

@@ -1,68 +1,10 @@
-# Chạy từ root project. Mỗi service load .env riêng trong apps/<service>/.env
-#
-#   docker compose up auth-service
-#   docker compose up --build
-#
-# Không chạy image trực tiếp trên Docker Desktop (Run) — sẽ thiếu env.
-# Dùng Compose hoặc: docker run --env-file apps/auth-service/.env ...
-
 services:
-  auth-service:
-    build:
-      context: .
-      dockerfile: apps/auth-service/Dockerfile
-    image: mcrservice/auth-service:0.1.0
+  mcrservice:
+    build: .
+    image: mcrservice:0.1.0
+    env_file: .env.local
     ports:
-      - "8081:8081"
-    env_file:
-      - apps/auth-service/.env
+      - "8080:8080"
     environment:
-      PORT: "8081"
-
-  user-service:
-    build:
-      context: .
-      dockerfile: apps/user-service/Dockerfile
-    image: mcrservice/user-service:0.1.0
-    ports:
-      - "8082:8082"
-    env_file:
-      - apps/user-service/.env
-    environment:
-      PORT: "8082"
-
-  feed-service:
-    build:
-      context: .
-      dockerfile: apps/feed-service/Dockerfile
-    image: mcrservice/feed-service:0.1.0
-    ports:
-      - "8083:8083"
-    env_file:
-      - apps/feed-service/.env
-    environment:
-      PORT: "8083"
-
-  search-service:
-    build:
-      context: .
-      dockerfile: apps/search-service/Dockerfile
-    image: mcrservice/search-service:0.1.0
-    ports:
-      - "8084:8084"
-    env_file:
-      - apps/search-service/.env
-    environment:
-      PORT: "8084"
-
-  worker-service:
-    build:
-      context: .
-      dockerfile: apps/worker-service/Dockerfile
-    image: mcrservice/worker-service:0.1.0
-    ports:
-      - "8085:8085"
-    env_file:
-      - apps/worker-service/.env
-    environment:
-      PORT: "8085"
+      NODE_ENV: development
+      PORT: "8080"

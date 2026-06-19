@@ -1,0 +1,135 @@
+openapi: 3.0.3
+info:
+  title: MCR Service - Auth module
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /auth/signup:
+    post:
+      summary: Đăng ký user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password, minLength: 8 }
+              additionalProperties: false
+      responses:
+        "200":
+          description: Kết quả đăng ký; session null nếu cần xác nhận email
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, session, requiresEmailConfirmation]
+                properties:
+                  user: { type: object, nullable: true }
+                  session: { type: object, nullable: true }
+                  requiresEmailConfirmation: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/BadRequest" }
+        "422": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/BadRequest" }
+        "503": { $ref: "#/components/responses/BadRequest" }
+  /auth/v1/user:
+    post:
+      summary: Đăng nhập user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200": { description: Session và user từ Supabase Auth }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /auth/password-reset:
+    post:
+      summary: Gửi OTP đặt lại mật khẩu
+      tags: [Auth]
+      requestBody:
+        $ref: "#/components/requestBodies/Identifier"
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /auth/password-reset/verify:
+    post:
+      summary: Kiểm tra OTP
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOtp"
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /auth/password-reset/complete:
+    post:
+      summary: Xác thực OTP và đặt mật khẩu mới
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/VerifyOtp"
+                - type: object
+                  required: [newPassword]
+                  properties:
+                    newPassword: { type: string, format: password, minLength: 8 }
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+components:
+  schemas:
+    Identifier:
+      type: object
+      required: [emailOrUsername]
+      properties:
+        emailOrUsername: { type: string, example: user@example.com }
+        locale: { type: string, enum: [vi, en], default: vi }
+    VerifyOtp:
+      allOf:
+        - $ref: "#/components/schemas/Identifier"
+        - type: object
+          required: [otpCode]
+          properties:
+            otpCode: { type: string, pattern: "^[0-9]{6}$", example: "123456" }
+  requestBodies:
+    Identifier:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Identifier" }
+  responses:
+    Ok:
+      description: Thành công
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok: { type: boolean, example: true }
+    BadRequest:
+      description: Dữ liệu hoặc nghiệp vụ không hợp lệ
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: {}
