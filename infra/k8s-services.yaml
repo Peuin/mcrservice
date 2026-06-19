@@ -85,6 +85,7 @@ metadata:
   namespace: peuin
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
   rules:
@@ -98,3 +99,7 @@ spec:
                 name: mcrservice
                 port:
                   number: 80
+  tls:
+    - hosts:
+        - mcrservice.peuinjournal.com
+      secretName: mcrservice-tls
