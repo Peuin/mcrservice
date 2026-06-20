@@ -105,16 +105,34 @@ function normalizeSignupError(error: unknown) {
 
 export async function signup(email: string, password: string) {
   const normalizedEmail = email.toLowerCase();
+  const admin = requireAdmin();
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
   try {
-    const { error: createError } = await requireAdmin().auth.admin.createUser({
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
       email: normalizedEmail,
       password,
       email_confirm: true
     });
     if (createError) throw createError;
+
+    const userId = created.user?.id;
+    if (!userId) {
+      throw new SignupError("SIGNUP_FAILED", "Dịch vụ xác thực không trả về người dùng vừa tạo.", 500);
+    }
+
+    const { error: profileError } = await admin.from("profiles").upsert({
+      id: userId,
+      email: normalizedEmail,
+      provider: "email",
+      is_active: true,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "id" });
+    if (profileError) {
+      await admin.auth.admin.deleteUser(userId).catch(() => undefined);
+      throw new SignupError("PROFILE_CREATE_FAILED", "Không thể tạo hồ sơ người dùng.", 500);
+    }
 
     const { data, error } = await client.auth.signInWithPassword({
       email: normalizedEmail,
