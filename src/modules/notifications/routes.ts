@@ -1,13 +1,25 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
-import { proxyEdgeFunction, type EdgeFunctionResult } from "../../shared/edge-function-proxy.js";
+import type { ApiResult } from "../../shared/api-result.js";
 import { inboxQuerySchema, notificationParamsSchema, pushTokenSchema, unregisterPushTokenSchema } from "./schemas.js";
-import { deleteNotification, listNotifications, markAllNotificationsRead, markNotificationRead, muteNotification, registerPushToken, unregisterPushToken } from "./service.js";
+import {
+  deleteNotification,
+  handleLegacyNotificationsRequest,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  muteNotification,
+  registerPushToken,
+  unregisterPushToken
+} from "./service.js";
 import { deleteNotificationDocs, listNotificationsDocs, markAllReadDocs, markReadDocs, muteNotificationDocs, registerPushTokenDocs, unregisterPushTokenDocs } from "./swagger.js";
 
 function invalid(reply: FastifyReply, details: unknown) {
   return reply.code(400).send({ success: false, code: "VALIDATION_ERROR", message: "Dữ liệu thông báo không hợp lệ.", details });
 }
-function send(reply: FastifyReply, result: EdgeFunctionResult) { return reply.code(result.status).send(result.payload); }
+
+function send(reply: FastifyReply, result: ApiResult) {
+  return reply.code(result.status).send(result.payload);
+}
 
 export const notificationRoutes: FastifyPluginAsync = async (app) => {
   app.get("/api/v1/notifications", { schema: listNotificationsDocs }, async (request, reply) => {
@@ -36,11 +48,21 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
     return parsed.success ? send(reply, await unregisterPushToken(request, parsed.data)) : invalid(reply, parsed.error.flatten());
   });
 
-  app.route({ method: ["GET", "POST"], url: "/notifications", schema: { hide: true }, handler: (request, reply) =>
-    proxyEdgeFunction(request, reply, { functionName: "notifications", query: asObject(request.query), body: request.body,
-      method: request.method as "GET" | "POST" }) });
+  app.route({
+    method: ["GET", "POST"],
+    url: "/notifications",
+    schema: { hide: true },
+    handler: async (request, reply) =>
+      send(
+        reply,
+        await handleLegacyNotificationsRequest(request, {
+          query: asObject(request.query),
+          body: request.body
+        })
+      )
+  });
 };
 
 function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }

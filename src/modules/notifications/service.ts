@@ -1,31 +1,221 @@
 import type { FastifyRequest } from "fastify";
-import { callEdgeFunction } from "../../shared/edge-function-proxy.js";
+import { localizeApiPayload } from "../../shared/api-i18n.js";
+import type { ApiResult } from "../../shared/api-result.js";
+import { errorMessage, stringValue } from "../../shared/helpers.js";
+import { redisSet } from "../../shared/redis.js";
+import { publicStorageUrl } from "../../shared/storage.js";
+import { createUserSupabaseClient, requireUser } from "../../shared/supabase-user.js";
 import type { InboxQuery, PushTokenInput, UnregisterPushTokenInput } from "./schemas.js";
+import { inboxQuerySchema, pushTokenSchema, unregisterPushTokenSchema } from "./schemas.js";
 
-type NotificationContext = Pick<FastifyRequest, "method" | "headers" | "id">;
+type Json = Record<string, unknown>;
+type NotificationContext = Pick<FastifyRequest, "headers" | "id">;
 
-function callNotifications(context: NotificationContext, options: { method?: "GET" | "POST"; query?: Record<string, unknown>; body?: unknown } = {}) {
-  return callEdgeFunction(context, { functionName: "notifications", method: options.method ?? "GET", query: options.query, body: options.body });
+const NOTIFICATIONS_CACHE_TTL_SECONDS = 300;
+
+function wrap(context: NotificationContext, status: number, payload: unknown): ApiResult {
+  return {
+    status,
+    payload: localizeApiPayload(context, status, payload, { functionName: "notifications" })
+  };
 }
 
-export function listNotifications(context: NotificationContext, query: InboxQuery) {
-  return callNotifications(context, { query });
+function clientFrom(context: NotificationContext) {
+  return createUserSupabaseClient(context.headers.authorization);
 }
-export function markNotificationRead(context: NotificationContext, notificationId: string) {
-  return callNotifications(context, { method: "POST", body: { action: "read", notificationId } });
+
+function buildNotificationInboxCacheKey(userId: string, options: { limit: number; before: string | null | undefined }) {
+  return [
+    "notifications:inbox:v1",
+    userId,
+    `limit:${options.limit}`,
+    `before:${options.before ?? "latest"}`
+  ].join(":");
 }
-export function markAllNotificationsRead(context: NotificationContext) {
-  return callNotifications(context, { method: "POST", body: { action: "mark_all_read" } });
+
+async function cacheNotificationInbox(
+  userId: string,
+  response: Json,
+  options: { limit: number; before: string | null | undefined }
+) {
+  if (!userId) return;
+  const now = new Date().toISOString();
+  const payload = {
+    ...response,
+    cachedAt: now,
+    userId,
+    limit: options.limit,
+    before: options.before ?? null
+  };
+  await redisSet(buildNotificationInboxCacheKey(userId, options), payload, NOTIFICATIONS_CACHE_TTL_SECONDS);
+  await redisSet(`notifications:last-opened:v1:${userId}`, { userId, openedAt: now }, 86400);
 }
-export function muteNotification(context: NotificationContext, notificationId: string) {
-  return callNotifications(context, { method: "POST", body: { action: "mute", notificationId } });
+
+function normalizePlatform(value: unknown): PushTokenInput["platform"] {
+  const platform = stringValue(value).trim().toLowerCase();
+  if (platform === "android" || platform === "ios" || platform === "macos" || platform === "web") {
+    return platform;
+  }
+  return "android";
 }
-export function deleteNotification(context: NotificationContext, notificationId: string) {
-  return callNotifications(context, { method: "POST", body: { action: "delete", notificationId } });
+
+export async function listNotifications(context: NotificationContext, query: InboxQuery): Promise<ApiResult> {
+  try {
+    const supabase = clientFrom(context);
+    const user = await requireUser(supabase, "Bạn cần đăng nhập để xem thông báo.");
+    const { data, error } = await supabase.schema("social").rpc("notification_inbox", {
+      p_limit: query.limit,
+      p_before: query.before ?? null
+    });
+    if (error) throw error;
+
+    const { data: unread, error: unreadError } = await supabase.schema("social").rpc("notification_unread_count");
+    if (unreadError) throw unreadError;
+
+    const response = {
+      notifications: (Array.isArray(data) ? (data as Json[]) : []).map((row) => ({
+        ...row,
+        actor_avatar_url: publicStorageUrl(supabase, "avatars", stringValue(row.actor_avatar_url))
+      })),
+      unreadCount: Number(unread ?? 0)
+    };
+    await cacheNotificationInbox(user.id, response, { limit: query.limit, before: query.before });
+    return wrap(context, 200, response);
+  } catch (error) {
+    return wrap(context, 400, { error: errorMessage(error, "Notifications request failed.") });
+  }
 }
-export function registerPushToken(context: NotificationContext, input: PushTokenInput) {
-  return callNotifications(context, { method: "POST", body: { action: "register_push_token", ...input } });
+
+export async function markNotificationRead(context: NotificationContext, notificationId: string): Promise<ApiResult> {
+  return mutateNotification(context, "mark_notification_read", notificationId);
 }
-export function unregisterPushToken(context: NotificationContext, input: UnregisterPushTokenInput) {
-  return callNotifications(context, { method: "POST", body: { action: "unregister_push_token", ...input } });
+
+export async function markAllNotificationsRead(context: NotificationContext): Promise<ApiResult> {
+  try {
+    const supabase = clientFrom(context);
+    await requireUser(supabase, "Bạn cần đăng nhập để xem thông báo.");
+    const { data, error } = await supabase.schema("social").rpc("mark_all_notifications_read");
+    if (error) throw error;
+    return wrap(context, 200, { ok: true, updatedCount: Number(data ?? 0) });
+  } catch (error) {
+    return wrap(context, 400, { error: errorMessage(error, "Notifications request failed.") });
+  }
+}
+
+export async function muteNotification(context: NotificationContext, notificationId: string): Promise<ApiResult> {
+  return mutateNotification(context, "mute_notification", notificationId);
+}
+
+export async function deleteNotification(context: NotificationContext, notificationId: string): Promise<ApiResult> {
+  return mutateNotification(context, "delete_notification", notificationId);
+}
+
+async function mutateNotification(
+  context: NotificationContext,
+  rpcName: "mark_notification_read" | "delete_notification" | "mute_notification",
+  notificationId: string
+): Promise<ApiResult> {
+  try {
+    const supabase = clientFrom(context);
+    await requireUser(supabase, "Bạn cần đăng nhập để xem thông báo.");
+    const { error } = await supabase.schema("social").rpc(rpcName, { p_notification_id: notificationId });
+    if (error) throw error;
+    return wrap(context, 200, { ok: true });
+  } catch (error) {
+    return wrap(context, 400, { error: errorMessage(error, "Notifications request failed.") });
+  }
+}
+
+export async function registerPushToken(context: NotificationContext, input: PushTokenInput): Promise<ApiResult> {
+  try {
+    const supabase = clientFrom(context);
+    const user = await requireUser(supabase, "Bạn cần đăng nhập để bật thông báo.");
+    const { error } = await supabase.schema("social").from("push_tokens").upsert(
+      {
+        user_id: user.id,
+        token: input.token,
+        platform: input.platform,
+        device_id: input.deviceId ?? null,
+        app_version: input.appVersion ?? null,
+        updated_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString()
+      },
+      { onConflict: "token" }
+    );
+    if (error) throw error;
+    return wrap(context, 200, { ok: true });
+  } catch (error) {
+    return wrap(context, 400, { error: errorMessage(error, "Notifications request failed.") });
+  }
+}
+
+export async function unregisterPushToken(context: NotificationContext, input: UnregisterPushTokenInput): Promise<ApiResult> {
+  try {
+    const supabase = clientFrom(context);
+    const user = await requireUser(supabase, "Bạn cần đăng nhập để tắt thông báo.");
+    const { error } = await supabase
+      .schema("social")
+      .from("push_tokens")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("token", input.token);
+    if (error) throw error;
+    return wrap(context, 200, { ok: true });
+  } catch (error) {
+    return wrap(context, 400, { error: errorMessage(error, "Notifications request failed.") });
+  }
+}
+
+export async function handleLegacyNotificationsRequest(context: NotificationContext & Pick<FastifyRequest, "method">, options: {
+  query?: Record<string, unknown>;
+  body?: unknown;
+}): Promise<ApiResult> {
+  if (context.method === "GET") {
+    const parsed = inboxQuerySchema.safeParse(options.query ?? {});
+    if (!parsed.success) {
+      return wrap(context, 400, { error: "Invalid notification query." });
+    }
+    return listNotifications(context, parsed.data);
+  }
+
+  const body = (options.body && typeof options.body === "object" && !Array.isArray(options.body)
+    ? options.body
+    : {}) as Json;
+  const action = stringValue(body.action).trim();
+
+  if (action === "register_push_token") {
+    const parsed = pushTokenSchema.safeParse({
+      token: body.token,
+      platform: body.platform,
+      deviceId: body.deviceId ?? body.device_id,
+      appVersion: body.appVersion ?? body.app_version
+    });
+    if (!parsed.success) {
+      return wrap(context, 400, { error: "Invalid push token payload." });
+    }
+    return registerPushToken(context, parsed.data);
+  }
+
+  if (action === "unregister_push_token") {
+    const parsed = unregisterPushTokenSchema.safeParse({ token: body.token });
+    if (!parsed.success) {
+      return wrap(context, 400, { error: "Invalid push token payload." });
+    }
+    return unregisterPushToken(context, parsed.data);
+  }
+
+  if (action === "read_all" || action === "mark_all_read") {
+    return markAllNotificationsRead(context);
+  }
+
+  const notificationId = stringValue(body.notificationId ?? body.id).trim();
+  if (!notificationId) {
+    return wrap(context, 400, { error: "Missing notificationId." });
+  }
+
+  if (action === "read") return markNotificationRead(context, notificationId);
+  if (action === "delete") return deleteNotification(context, notificationId);
+  if (action === "mute") return muteNotification(context, notificationId);
+
+  return wrap(context, 400, { error: "Unsupported notification action." });
 }

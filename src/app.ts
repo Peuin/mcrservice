@@ -4,6 +4,7 @@ import swaggerUi from "@fastify/swagger-ui";
 import Fastify from "fastify";
 import { env } from "./config/env.js";
 import { localizeDirectPayload } from "./shared/api-i18n.js";
+import { feedbackRoutes } from "./modules/feedback/routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { aiAskRoutes } from "./modules/aiask/routes.js";
 import { feedRoutes } from "./modules/feed/routes.js";
@@ -38,6 +39,7 @@ export async function buildApp() {
 
   app.get("/health", async () => ({ status: "ok", service: "mcrservice" }));
   await app.register(authRoutes);
+  await app.register(feedbackRoutes);
   await app.register(aiAskRoutes);
   await app.register(profileRoutes);
   await app.register(feedRoutes);
