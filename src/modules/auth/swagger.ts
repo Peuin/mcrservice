@@ -73,3 +73,4 @@ export const completeResetDocs = {
   },
   response: { 200: { ...okResponse, properties: { ...okResponse.properties, email: { type: "string", format: "email" } } }, 400: errorResponse }
 } as const;
+
