@@ -16,6 +16,11 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
+
+# Deploy key for git operations (SSH)
+# Add SSH_PRIVATE_KEY secret with the deploy private key
+# Add KNOWN_HOSTS secret with: github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
 
 concurrency:
   group: mcrservice-amd64-${{ github.ref }}
@@ -74,6 +79,15 @@ jobs:
         run: |
           sed -i "s|image: ghcr.io/peuin/mcrservice:.*|image: ${IMAGE}|" infra/k8s-services.yaml
           grep -F "image: ${IMAGE}" infra/k8s-services.yaml
+
+      - name: Setup SSH for git push
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-known-hosts: ${{ secrets.KNOWN_HOSTS }}
+
+      - name: Change remote to SSH
+        run: git remote set-url origin git@github.com:Peuin/mcrservice.git
 
       - name: Commit deployment revision
         run: |
