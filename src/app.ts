@@ -6,7 +6,7 @@ import { env } from "./config/env.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { feedRoutes } from "./modules/feed/routes.js";
 import { searchRoutes } from "./modules/search/routes.js";
-import { userRoutes } from "./modules/profile/routes.js";
+import { profileRoutes } from "./modules/profile/routes.js";
 import { workerRoutes } from "./modules/worker/routes.js";
 
 export async function buildApp() {
@@ -26,7 +26,7 @@ export async function buildApp() {
 
   app.get("/health", async () => ({ status: "ok", service: "mcrservice" }));
   await app.register(authRoutes);
-  await app.register(userRoutes);
+  await app.register(profileRoutes);
   await app.register(feedRoutes);
   await app.register(searchRoutes);
   await app.register(workerRoutes);
