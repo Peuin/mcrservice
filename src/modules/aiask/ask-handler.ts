@@ -7,11 +7,6 @@ import { readHeader, type PortedRequest } from "../../shared/handler-runtime.js"
 
 type Json = Record<string, unknown>;
 
-function runBackgroundTask(task: Promise<unknown>) {
-  void task.catch((error) => console.error("[ask-peuin] background task failed", error));
-}
-
-
 type ChatRole = "user" | "assistant" | "system";
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
