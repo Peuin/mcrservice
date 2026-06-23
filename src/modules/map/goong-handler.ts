@@ -1,7 +1,7 @@
 // @ts-nocheck
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { env } from "../../config/env.js";
+import { requireSupabaseAdmin } from "../../shared/supabase.js";
 import { type PortedRequest } from "../../shared/handler-runtime.js";
 
 type Json = Record<string, unknown>;
@@ -41,17 +41,7 @@ function runBackgroundTask(task: Promise<unknown>) {
   
 
   function createSupabaseClient() {
-    const supabaseUrl = env.SUPABASE_URL;
-    const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY ||
-      env.SUPABASE_SECRET_KEY;
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error("Thiếu SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY.");
-    }
-
-    return createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    return requireSupabaseAdmin();
   }
 
   async function fetchExpandedSuggestions({
@@ -139,7 +129,11 @@ function runBackgroundTask(task: Promise<unknown>) {
       return rankLocalPlaces(normalizePlaceRows(rpcResult.data), nearLat, nearLng)
         .slice(0, limit);
     }
-    console.error("search_places rpc failed, fallback to ilike", rpcResult.error);
+    console.error("search_places rpc failed, fallback to ilike", {
+      code: rpcResult.error.code,
+      message: rpcResult.error.message,
+      hint: rpcResult.error.hint,
+    });
 
     const selectColumns =
       "id,name,address,lat,lng,latitude,longitude,category,vietmap_ref_id,provider";
