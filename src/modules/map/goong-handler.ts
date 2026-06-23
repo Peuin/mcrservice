@@ -2,7 +2,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { env } from "../../config/env.js";
-import { readHeader, type PortedRequest } from "../../shared/handler-runtime.js";
+import { type PortedRequest } from "../../shared/handler-runtime.js";
 
 type Json = Record<string, unknown>;
 
@@ -40,23 +40,17 @@ function runBackgroundTask(task: Promise<unknown>) {
 
   
 
-  function createSupabaseClient(request: PortedRequest) {
+  function createSupabaseClient() {
     const supabaseUrl = env.SUPABASE_URL;
-    const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY ||
-      env.SUPABASE_SECRET_KEY ||
-      env.SUPABASE_ANON_KEY;
+    const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY ||
+      env.SUPABASE_SECRET_KEY;
 
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error("Thiếu SUPABASE_URL hoặc Supabase API key.");
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error("Thiếu SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY.");
     }
 
-    return createClient(supabaseUrl, supabaseKey, {
-      auth: { persistSession: false },
-      global: {
-        headers: {
-          Authorization: readHeader(request.headers, "authorization") ?? "",
-        },
-      },
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
     });
   }
 
@@ -1026,7 +1020,7 @@ export async function handleGoongPlaceSearch(request: PortedRequest): Promise<Re
         localOnly,
       });
 
-      const supabase = createSupabaseClient(request);
+      const supabase = createSupabaseClient();
 
       // If query is empty but coordinates are provided, perform nearby search.
       if (!query) {
@@ -1132,27 +1126,23 @@ export async function handleGoongPlaceSearch(request: PortedRequest): Promise<Re
         });
       }
 
-      const minLocalThreshold = Math.min(5, limit);
+      // Ưu tiên core.places — chỉ gọi Goong khi DB không có kết quả.
+      if (localPlaces.length > 0) {
+        const rankedPlaces = nearLat != null && nearLng != null
+          ? [...localPlaces]
+            .filter(hasPlaceCoordinates)
+            .sort(
+              (a, b) =>
+                placeDistanceKm(a, nearLat, nearLng) -
+                placeDistanceKm(b, nearLat, nearLng),
+            )
+          : localPlaces;
+        const places = (rankedPlaces.length > 0 ? rankedPlaces : localPlaces)
+          .slice(0, limit);
 
-      if (nearLat != null && nearLng != null) {
-        const nearbyLocal = localPlaces
-          .filter(hasPlaceCoordinates)
-          .sort(
-            (a, b) =>
-              placeDistanceKm(a, nearLat, nearLng) -
-              placeDistanceKm(b, nearLat, nearLng),
-          );
-
-        if (nearbyLocal.length >= minLocalThreshold) {
-          return jsonResponse({
-            places: nearbyLocal.slice(0, limit),
-            source: "db-nearby-ranked",
-          });
-        }
-      } else if (localPlaces.length >= minLocalThreshold) {
         return jsonResponse({
-          places: localPlaces.slice(0, limit),
-          source: "db",
+          places,
+          source: nearLat != null && nearLng != null ? "db-nearby-ranked" : "db",
           localError: local.error,
         });
       }
@@ -1182,6 +1172,7 @@ export async function handleGoongPlaceSearch(request: PortedRequest): Promise<Re
         nearLat,
         nearLng,
         mode: "search",
+        reason: "db-empty",
       });
 
       const mergedSuggestions = await fetchExpandedSuggestions({
@@ -1197,7 +1188,13 @@ export async function handleGoongPlaceSearch(request: PortedRequest): Promise<Re
       );
 
       await setCachedPlaces(cacheKey, places);
-      return jsonResponse({ places, cache: "miss", queries: searchQueries });
+      return jsonResponse({
+        places,
+        cache: "miss",
+        source: "goong",
+        queries: searchQueries,
+        localError: local.error,
+      });
     } catch (error) {
       console.error("goong-place-search error", error);
       const message = errorMessage(error);
