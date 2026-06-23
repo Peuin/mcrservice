@@ -8,7 +8,6 @@ import { handleFoodCatalog } from "../modules/gov-data/food-catalog/handler.js";
 import { handleFriends } from "../modules/gov-data/friends/handler.js";
 import { handleJournal } from "../modules/journal/handler.js";
 import { handleGoongPlaceSearch } from "../modules/map/goong-handler.js";
-import { handleVietmapPlaceSearch } from "../modules/map/vietmap-handler.js";
 import { handleNotifications } from "../modules/notifications/legacy-handler.js";
 import { handleProfile } from "../modules/profile/handler.js";
 import { handleAppSearch } from "../modules/search/handler.js";
@@ -48,7 +47,7 @@ const handlers: Record<string, (request: PortedRequest) => Promise<Response>> = 
   personality: handlePersonality,
   profile: handleProfile,
   stories: handleStories,
-  "vietmap-place-search": handleVietmapPlaceSearch
+  "vietmap-place-search": handleGoongPlaceSearch
 };
 
 export async function callEdgeFunction(
