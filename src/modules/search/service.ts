@@ -8,18 +8,20 @@ function callSearch(context: SearchContext, functionPath: string, options: {
   method?: "GET" | "POST" | "DELETE";
   query?: Record<string, unknown>;
   body?: unknown;
+  forwardClientAuth?: boolean;
 } = {}) {
   return callEdgeFunction(context, {
     functionName: "app-search", functionPath,
-    method: options.method ?? "GET", query: options.query, body: options.body
+    method: options.method ?? "GET", query: options.query, body: options.body,
+    forwardClientAuth: options.forwardClientAuth,
   });
 }
 
 export function discover(context: SearchContext, query: DiscoverQuery) {
-  return callSearch(context, "", { query });
+  return callSearch(context, "", { query, forwardClientAuth: false });
 }
 export function searchPosts(context: SearchContext, query: SearchPostsQuery) {
-  return callSearch(context, "posts", { query });
+  return callSearch(context, "posts", { query, forwardClientAuth: false });
 }
 export function listRecent(context: SearchContext, query: RecentQuery) {
   return callSearch(context, "recent", { query });

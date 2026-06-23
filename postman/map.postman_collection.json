@@ -1,0 +1,179 @@
+{
+  "info": {
+    "name": "MCR Service - Map",
+    "description": "Test endpoints trong src/modules/map",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "API v1",
+      "item": [
+        {
+          "name": "Search places (Goong) - query only",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/map/places/goong?query=VNG&limit=12&local_only=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "map", "places", "goong"],
+              "query": [
+                { "key": "query", "value": "VNG" },
+                { "key": "limit", "value": "12" },
+                { "key": "local_only", "value": "false" }
+              ]
+            },
+            "description": "Ưu tiên DB core.places, không có thì gọi Goong và lưu DB."
+          }
+        },
+        {
+          "name": "Search places (Goong) - local only",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/map/places/goong?query=pho&limit=12&local_only=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "map", "places", "goong"],
+              "query": [
+                { "key": "query", "value": "pho" },
+                { "key": "limit", "value": "12" },
+                { "key": "local_only", "value": "true" }
+              ]
+            },
+            "description": "Chỉ tìm trong core.places, không gọi Goong."
+          }
+        },
+        {
+          "name": "Search places (Goong) - with coordinates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/map/places/goong?query=cafe&near_lat=10.7769&near_lng=106.7009&limit=12&local_only=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "map", "places", "goong"],
+              "query": [
+                { "key": "query", "value": "cafe" },
+                { "key": "near_lat", "value": "10.7769" },
+                { "key": "near_lng", "value": "106.7009" },
+                { "key": "limit", "value": "12" },
+                { "key": "local_only", "value": "false" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Nearby places (no query, coords only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/map/places/goong?near_lat=10.7769&near_lng=106.7009&limit=12&local_only=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "map", "places", "goong"],
+              "query": [
+                { "key": "near_lat", "value": "10.7769" },
+                { "key": "near_lng", "value": "106.7009" },
+                { "key": "limit", "value": "12" },
+                { "key": "local_only", "value": "false" }
+              ]
+            },
+            "description": "Không cần query khi có near_lat + near_lng."
+          }
+        },
+        {
+          "name": "Search places (vietmap alias)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/map/places/vietmap?query=VNG&limit=12",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "map", "places", "vietmap"],
+              "query": [
+                { "key": "query", "value": "VNG" },
+                { "key": "limit", "value": "12" }
+              ]
+            },
+            "description": "Backward-compatible URL, cùng logic Goong."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Legacy edge paths",
+      "item": [
+        {
+          "name": "GET /goong-place-search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/goong-place-search?query=VNG&limit=12&local_only=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["goong-place-search"],
+              "query": [
+                { "key": "query", "value": "VNG" },
+                { "key": "limit", "value": "12" },
+                { "key": "local_only", "value": "false" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /goong-place-search",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"VNG\",\n  \"limit\": 12,\n  \"local_only\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/goong-place-search",
+              "host": ["{{baseUrl}}"],
+              "path": ["goong-place-search"]
+            }
+          }
+        },
+        {
+          "name": "GET /vietmap-place-search (Goong impl)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/vietmap-place-search?query=VNG&limit=12",
+              "host": ["{{baseUrl}}"],
+              "path": ["vietmap-place-search"],
+              "query": [
+                { "key": "query", "value": "VNG" },
+                { "key": "limit", "value": "12" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    }
+  ]
+}

@@ -26,6 +26,7 @@ type ProxyOptions = {
   body?: unknown;
   internalSecret?: string;
   internalSecretHeader?: "x-cron-secret" | "x-push-secret";
+  forwardClientAuth?: boolean;
 };
 
 /** @deprecated Prefer ApiResult from api-result.ts for native modules. */
@@ -103,6 +104,10 @@ function normalizeHeaders(
   for (const [key, value] of Object.entries(headers)) {
     if (Array.isArray(value)) normalized[key.toLowerCase()] = value[0];
     else if (typeof value === "string") normalized[key.toLowerCase()] = value;
+  }
+  if (options.forwardClientAuth === false) {
+    delete normalized.authorization;
+    delete normalized.apikey;
   }
   if (options.internalSecret) {
     normalized[options.internalSecretHeader ?? "x-cron-secret"] = options.internalSecret;
