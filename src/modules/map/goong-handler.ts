@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { randomUUID } from "node:crypto";
 import { env } from "../../config/env.js";
-import { requireSupabaseAdmin } from "../../shared/supabase.js";
 import { type PortedRequest } from "../../shared/handler-runtime.js";
+import { createPlaceSearchClient } from "./place-search-client.js";
 
 type Json = Record<string, unknown>;
 
@@ -40,8 +40,8 @@ function runBackgroundTask(task: Promise<unknown>) {
 
   
 
-  function createSupabaseClient() {
-    return requireSupabaseAdmin();
+  function createSupabaseClient(request?: PortedRequest) {
+    return createPlaceSearchClient(request);
   }
 
   async function fetchExpandedSuggestions({
@@ -1014,7 +1014,7 @@ export async function handleGoongPlaceSearch(request: PortedRequest): Promise<Re
         localOnly,
       });
 
-      const supabase = createSupabaseClient();
+      const supabase = createSupabaseClient(request);
 
       // If query is empty but coordinates are provided, perform nearby search.
       if (!query) {

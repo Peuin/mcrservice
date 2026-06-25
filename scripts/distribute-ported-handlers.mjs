@@ -20,7 +20,6 @@ const HANDLER_TARGETS = {
   "food-catalog": "gov-data/food-catalog/handler.ts",
   friends: "gov-data/friends/handler.ts",
   "goong-place-search": "map/goong-handler.ts",
-  "vietmap-place-search": "map/vietmap-handler.ts",
   "home-feed": "feed/handler.ts",
   "home-feed-warm": "feed/warm-handler.ts",
   journal: "journal/handler.ts",

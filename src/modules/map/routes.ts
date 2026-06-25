@@ -15,17 +15,26 @@ export const mapRoutes: FastifyPluginAsync = async (app) => {
     return parsed.success ? send(reply, await searchGoongPlaces(request, parsed.data)) : invalid(reply, parsed.error.flatten());
   });
 
-  for (const path of ["/goong-place-search", "/search/goong-place-search", "/vietmap-place-search", "/search/vietmap-place-search"]) {
-      app.route({ method: ["GET", "POST"], url: path, schema: { hide: true }, handler: (request, reply) =>
-        proxyEdgeFunction(request, reply, { functionName: "goong-place-search", query: asObject(request.query), body: request.body,
-          method: request.method as "GET" | "POST" }) });
-  }
-
-  // Backward-compatible URL; implementation is Goong-only.
+  // Alias tương thích — implementation Goong.
   app.get("/api/v1/map/places/vietmap", { schema: { hide: true } }, async (request, reply) => {
     const parsed = placeSearchSchema.safeParse(request.query);
     return parsed.success ? send(reply, await searchGoongPlaces(request, parsed.data)) : invalid(reply, parsed.error.flatten());
   });
+
+  for (const path of ["/goong-place-search", "/search/goong-place-search", "/vietmap-place-search", "/search/vietmap-place-search"]) {
+    app.route({
+      method: ["GET", "POST"],
+      url: path,
+      schema: { hide: true },
+      handler: (request, reply) =>
+        proxyEdgeFunction(request, reply, {
+          functionName: "goong-place-search",
+          query: asObject(request.query),
+          body: request.body,
+          method: request.method as "GET" | "POST"
+        })
+    });
+  }
 };
 
 function asObject(value: unknown): Record<string, unknown> {
