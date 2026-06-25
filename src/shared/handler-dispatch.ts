@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { env } from "../config/env.js";
 import { handleAskPeuin } from "../modules/aiask/ask-handler.js";
 import { handlePersonality } from "../modules/aiask/personality-handler.js";
 import { handleAppFeedback } from "../modules/feedback/handler.js";
@@ -8,7 +9,6 @@ import { handleFoodCatalog } from "../modules/gov-data/food-catalog/handler.js";
 import { handleFriends } from "../modules/gov-data/friends/handler.js";
 import { handleJournal } from "../modules/journal/handler.js";
 import { handleGoongPlaceSearch } from "../modules/map/goong-handler.js";
-import { handleNotifications } from "../modules/notifications/legacy-handler.js";
 import { handleProfile } from "../modules/profile/handler.js";
 import { handleAppSearch } from "../modules/search/handler.js";
 import { handleAppSearchWarm } from "../modules/search/warm-handler.js";
@@ -18,9 +18,11 @@ import { localizeApiPayload } from "./api-i18n.js";
 import type { ApiResult } from "./api-result.js";
 import { invokePorted, type PortedRequest } from "./handler-runtime.js";
 
-type ProxyOptions = {
-  functionName: string;
-  functionPath?: string;
+export type HandlerResult = ApiResult;
+
+type HandlerDispatchOptions = {
+  name: string;
+  path?: string;
   method?: "GET" | "POST" | "DELETE";
   query?: Record<string, unknown>;
   body?: unknown;
@@ -28,9 +30,6 @@ type ProxyOptions = {
   internalSecretHeader?: "x-cron-secret" | "x-push-secret";
   forwardClientAuth?: boolean;
 };
-
-/** @deprecated Prefer ApiResult from api-result.ts for native modules. */
-export type EdgeFunctionResult = ApiResult;
 
 const handlers: Record<string, (request: PortedRequest) => Promise<Response>> = {
   "app-feedback": handleAppFeedback,
@@ -44,27 +43,26 @@ const handlers: Record<string, (request: PortedRequest) => Promise<Response>> = 
   "home-feed-warm": handleHomeFeedWarm,
   journal: handleJournal,
   "notification-push": handleNotificationPush,
-  notifications: handleNotifications,
   personality: handlePersonality,
   profile: handleProfile,
   stories: handleStories,
   "vietmap-place-search": handleGoongPlaceSearch
 };
 
-export async function callEdgeFunction(
+export async function callHandler(
   request: Pick<FastifyRequest, "method" | "headers" | "id">,
-  options: ProxyOptions
-): Promise<EdgeFunctionResult> {
-  const handler = handlers[options.functionName];
+  options: HandlerDispatchOptions
+): Promise<HandlerResult> {
+  const handler = handlers[options.name];
   if (!handler) {
     return {
       status: 501,
-      payload: { success: false, code: "NOT_IMPLEMENTED", message: `Handler ${options.functionName} is not available.` }
+      payload: { success: false, code: "NOT_IMPLEMENTED", message: `Handler ${options.name} is not available.` }
     };
   }
 
   const headers = normalizeHeaders(request.headers, options);
-  const url = buildFunctionUrl(options);
+  const url = buildHandlerUrl(options);
   const result = await invokePorted(handler, {
     method: options.method ?? (request.method as "GET" | "POST" | "DELETE"),
     headers,
@@ -74,22 +72,22 @@ export async function callEdgeFunction(
 
   return {
     status: result.status,
-    payload: localizeApiPayload(request, result.status, result.payload, options)
+    payload: localizeApiPayload(request, result.status, result.payload, { functionName: options.name })
   };
 }
 
-export async function proxyEdgeFunction(
+export async function proxyHandler(
   request: FastifyRequest,
   reply: FastifyReply,
-  options: ProxyOptions
+  options: HandlerDispatchOptions
 ) {
-  const result = await callEdgeFunction(request, options);
+  const result = await callHandler(request, options);
   return reply.code(result.status).send(result.payload);
 }
 
-function buildFunctionUrl(options: ProxyOptions) {
-  const path = options.functionPath ? `/${options.functionPath.replace(/^\/+/, "")}` : "";
-  const url = new URL(`/functions/v1/${options.functionName}${path}`, "http://mcrservice.local");
+function buildHandlerUrl(options: HandlerDispatchOptions) {
+  const suffix = options.path ? `/${options.path.replace(/^\/+/, "")}` : "";
+  const url = new URL(`/${options.name}${suffix}`, "http://mcrservice.local");
   for (const [key, value] of Object.entries(options.query ?? {})) {
     if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
   }
@@ -98,7 +96,7 @@ function buildFunctionUrl(options: ProxyOptions) {
 
 function normalizeHeaders(
   headers: FastifyRequest["headers"],
-  options: ProxyOptions
+  options: HandlerDispatchOptions
 ): Record<string, string | undefined> {
   const normalized: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(headers)) {
@@ -108,6 +106,8 @@ function normalizeHeaders(
   if (options.forwardClientAuth === false) {
     delete normalized.authorization;
     delete normalized.apikey;
+  } else if (!normalized.apikey) {
+    normalized.apikey = env.SUPABASE_ANON_KEY;
   }
   if (options.internalSecret) {
     normalized[options.internalSecretHeader ?? "x-cron-secret"] = options.internalSecret;

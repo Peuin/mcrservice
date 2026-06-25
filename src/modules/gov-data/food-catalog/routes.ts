@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
-import { proxyEdgeFunction, type EdgeFunctionResult } from "../../../shared/edge-function-proxy.js";
+import type { HandlerResult } from "../../../shared/handler-dispatch.js";
 import { createFoodCatalogItemSchema, foodCatalogParamsSchema, setFoodCatalogMarkSchema } from "./schemas.js";
 import { createFoodCatalogItem, listFoodCatalog, setFoodCatalogMark } from "./service.js";
 import { createFoodCatalogItemDocs, listFoodCatalogDocs, setFoodCatalogMarkDocs } from "./swagger.js";
@@ -7,7 +7,7 @@ import { createFoodCatalogItemDocs, listFoodCatalogDocs, setFoodCatalogMarkDocs 
 function invalid(reply: FastifyReply, details: unknown) {
   return reply.code(400).send({ success: false, code: "VALIDATION_ERROR", message: "Dữ liệu Food Catalog không hợp lệ.", details });
 }
-function send(reply: FastifyReply, result: EdgeFunctionResult) { return reply.code(result.status).send(result.payload); }
+function send(reply: FastifyReply, result: HandlerResult) { return reply.code(result.status).send(result.payload); }
 function issues(...results: Array<{ success: boolean; error?: { flatten(): unknown } }>) {
   return results.find((result) => !result.success)?.error?.flatten() ?? null;
 }
@@ -28,8 +28,4 @@ export const foodCatalogRoutes: FastifyPluginAsync = async (app) => {
       ? send(reply, await setFoodCatalogMark(request, params.data.foodCatalogId, body.data))
       : invalid(reply, issues(params, body));
   });
-
-  app.route({ method: ["GET", "POST"], url: "/food-catalog", schema: { hide: true }, handler: (request, reply) =>
-    proxyEdgeFunction(request, reply, { functionName: "food-catalog", body: request.body,
-      method: request.method as "GET" | "POST" }) });
 };

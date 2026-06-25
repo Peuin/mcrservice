@@ -39,7 +39,35 @@ export const toggleLoveSchema = z.object({
   currentlyLiked: z.boolean()
 }).strict();
 
+export const mutualFriendsQuerySchema = z.object({
+  q: z.string().trim().max(200).default(""),
+  limit: z.coerce.number().int().min(1).max(50).default(12)
+}).strict();
+
+export const topicHotQuerySchema = z.object({
+  slug: z.string().trim().min(1).max(100)
+}).strict();
+
+export const saveFrameSchema = z.object({
+  id: uuidSchema.optional(),
+  name: z.string().trim().min(1).max(200),
+  templateKey: z.string().trim().min(1).max(100),
+  imagePath: z.string().trim().max(2048).default(""),
+  primaryColor: z.string().trim().max(20),
+  secondaryColor: z.string().trim().max(20),
+  accentColor: z.string().trim().max(20),
+  isDefault: z.boolean().default(false)
+}).strict();
+
+export const setDefaultFrameSchema = z.object({
+  frameId: uuidSchema
+}).strict();
+
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
 export type CreatePostInput = z.infer<typeof createPostSchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type ToggleLoveInput = z.infer<typeof toggleLoveSchema>;
+export type MutualFriendsQuery = z.infer<typeof mutualFriendsQuerySchema>;
+export type TopicHotQuery = z.infer<typeof topicHotQuerySchema>;
+export type SaveFrameInput = z.infer<typeof saveFrameSchema>;
+export type SetDefaultFrameInput = z.infer<typeof setDefaultFrameSchema>;

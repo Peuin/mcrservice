@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
-import { proxyEdgeFunction, type EdgeFunctionResult } from "../../shared/edge-function-proxy.js";
+import type { HandlerResult } from "../../shared/handler-dispatch.js";
 import { askPeuinSchema, personalityReplySchema, recommendationFeedbackSchema } from "./schemas.js";
 import { askPeuin, generatePersonalityReply, getTodaySession, saveRecommendationFeedback, testPersonalityMarkdown } from "./service.js";
 import { askPeuinDocs, personalityHealthDocs, personalityReplyDocs, recommendationFeedbackDocs, todaySessionDocs } from "./swagger.js";
@@ -7,7 +7,7 @@ import { askPeuinDocs, personalityHealthDocs, personalityReplyDocs, recommendati
 function invalid(reply: FastifyReply, details: unknown) {
   return reply.code(400).send({ success: false, code: "VALIDATION_ERROR", message: "Dữ liệu Ask Peuin không hợp lệ.", details });
 }
-function send(reply: FastifyReply, result: EdgeFunctionResult) { return reply.code(result.status).send(result.payload); }
+function send(reply: FastifyReply, result: HandlerResult) { return reply.code(result.status).send(result.payload); }
 
 export const aiAskRoutes: FastifyPluginAsync = async (app) => {
   app.post("/api/v1/ai/ask", { schema: askPeuinDocs }, async (request, reply) => {
@@ -26,13 +26,4 @@ export const aiAskRoutes: FastifyPluginAsync = async (app) => {
   });
   app.get("/api/v1/ai/personality/health", { schema: personalityHealthDocs }, async (request, reply) =>
     send(reply, await testPersonalityMarkdown(request)));
-
-  for (const path of ["/ask-peuin", "/user/ask-peuin"]) {
-    app.post(path, { schema: { hide: true } }, (request, reply) =>
-      proxyEdgeFunction(request, reply, { functionName: "ask-peuin", method: "POST", body: request.body }));
-  }
-  for (const path of ["/personality", "/user/personality"]) {
-    app.post(path, { schema: { hide: true } }, (request, reply) =>
-      proxyEdgeFunction(request, reply, { functionName: "personality", method: "POST", body: request.body }));
-  }
 };

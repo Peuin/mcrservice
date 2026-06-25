@@ -1,12 +1,12 @@
 import type { FastifyRequest } from "fastify";
-import { callEdgeFunction } from "../../shared/edge-function-proxy.js";
+import { callHandler } from "../../shared/handler-dispatch.js";
 import type { PlaceSearchInput } from "./schemas.js";
 
 type MapContext = Pick<FastifyRequest, "method" | "headers" | "id">;
 
 export function searchGoongPlaces(context: MapContext, input: PlaceSearchInput) {
-  return callEdgeFunction(context, {
-    functionName: "goong-place-search",
+  return callHandler(context, {
+    name: "goong-place-search",
     method: "GET",
     query: {
       query: input.query,

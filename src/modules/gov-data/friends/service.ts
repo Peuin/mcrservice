@@ -1,13 +1,13 @@
 import type { FastifyRequest } from "fastify";
-import { callEdgeFunction } from "../../../shared/edge-function-proxy.js";
+import { callHandler } from "../../../shared/handler-dispatch.js";
 import type { FriendsQuery, RequestsQuery, RespondRequestInput } from "./schemas.js";
 
 type FriendsContext = Pick<FastifyRequest, "method" | "headers" | "id">;
 function get(context: FriendsContext, query: Record<string, unknown>) {
-  return callEdgeFunction(context, { functionName: "friends", method: "GET", query });
+  return callHandler(context, { name: "friends", method: "GET", query });
 }
 function action(context: FriendsContext, body: Record<string, unknown>) {
-  return callEdgeFunction(context, { functionName: "friends", method: "POST", body });
+  return callHandler(context, { name: "friends", method: "POST", body });
 }
 
 export function listFriends(context: FriendsContext, query: FriendsQuery) { return get(context, query); }

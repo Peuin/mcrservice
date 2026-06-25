@@ -6,7 +6,6 @@ import { redisSet } from "../../shared/redis.js";
 import { publicStorageUrl } from "../../shared/storage.js";
 import { createUserSupabaseClient, requireUser } from "../../shared/supabase-user.js";
 import type { InboxQuery, PushTokenInput, UnregisterPushTokenInput } from "./schemas.js";
-import { inboxQuerySchema, pushTokenSchema, unregisterPushTokenSchema } from "./schemas.js";
 
 type Json = Record<string, unknown>;
 type NotificationContext = Pick<FastifyRequest, "headers" | "id">;
@@ -164,58 +163,4 @@ export async function unregisterPushToken(context: NotificationContext, input: U
   } catch (error) {
     return wrap(context, 400, { error: errorMessage(error, "Notifications request failed.") });
   }
-}
-
-export async function handleLegacyNotificationsRequest(context: NotificationContext & Pick<FastifyRequest, "method">, options: {
-  query?: Record<string, unknown>;
-  body?: unknown;
-}): Promise<ApiResult> {
-  if (context.method === "GET") {
-    const parsed = inboxQuerySchema.safeParse(options.query ?? {});
-    if (!parsed.success) {
-      return wrap(context, 400, { error: "Invalid notification query." });
-    }
-    return listNotifications(context, parsed.data);
-  }
-
-  const body = (options.body && typeof options.body === "object" && !Array.isArray(options.body)
-    ? options.body
-    : {}) as Json;
-  const action = stringValue(body.action).trim();
-
-  if (action === "register_push_token") {
-    const parsed = pushTokenSchema.safeParse({
-      token: body.token,
-      platform: body.platform,
-      deviceId: body.deviceId ?? body.device_id,
-      appVersion: body.appVersion ?? body.app_version
-    });
-    if (!parsed.success) {
-      return wrap(context, 400, { error: "Invalid push token payload." });
-    }
-    return registerPushToken(context, parsed.data);
-  }
-
-  if (action === "unregister_push_token") {
-    const parsed = unregisterPushTokenSchema.safeParse({ token: body.token });
-    if (!parsed.success) {
-      return wrap(context, 400, { error: "Invalid push token payload." });
-    }
-    return unregisterPushToken(context, parsed.data);
-  }
-
-  if (action === "read_all" || action === "mark_all_read") {
-    return markAllNotificationsRead(context);
-  }
-
-  const notificationId = stringValue(body.notificationId ?? body.id).trim();
-  if (!notificationId) {
-    return wrap(context, 400, { error: "Missing notificationId." });
-  }
-
-  if (action === "read") return markNotificationRead(context, notificationId);
-  if (action === "delete") return deleteNotification(context, notificationId);
-  if (action === "mute") return muteNotification(context, notificationId);
-
-  return wrap(context, 400, { error: "Unsupported notification action." });
 }

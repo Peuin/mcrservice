@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
-import { proxyEdgeFunction, type EdgeFunctionResult } from "../../../shared/edge-function-proxy.js";
+import type { HandlerResult } from "../../../shared/handler-dispatch.js";
 import { friendsQuerySchema, requestIdParamsSchema, requestsQuerySchema, respondRequestSchema, userIdParamsSchema } from "./schemas.js";
 import { blockUser, cancelFriendRequest, getFriendshipStatus, listFriendRequests, listFriends, removeFriendship, respondFriendRequest, sendFriendRequest, unblockUser } from "./service.js";
 import { blockUserDocs, cancelRequestDocs, listFriendsDocs, listRequestsDocs, removeFriendshipDocs, respondRequestDocs, sendRequestDocs, statusDocs, unblockUserDocs } from "./swagger.js";
@@ -7,7 +7,7 @@ import { blockUserDocs, cancelRequestDocs, listFriendsDocs, listRequestsDocs, re
 function invalid(reply: FastifyReply, details: unknown) {
   return reply.code(400).send({ success: false, code: "VALIDATION_ERROR", message: "Dữ liệu bạn bè không hợp lệ.", details });
 }
-function send(reply: FastifyReply, result: EdgeFunctionResult) { return reply.code(result.status).send(result.payload); }
+function send(reply: FastifyReply, result: HandlerResult) { return reply.code(result.status).send(result.payload); }
 function issues(...results: Array<{ success: boolean; error?: { flatten(): unknown } }>) {
   return results.find((result) => !result.success)?.error?.flatten() ?? null;
 }
@@ -51,14 +51,4 @@ export const friendRoutes: FastifyPluginAsync = async (app) => {
     const parsed = userIdParamsSchema.safeParse(request.params);
     return parsed.success ? send(reply, await unblockUser(request, parsed.data.userId)) : invalid(reply, parsed.error.flatten());
   });
-
-  for (const path of ["/friends", "/user/friends"]) {
-    app.route({ method: ["GET", "POST"], url: path, schema: { hide: true }, handler: (request, reply) =>
-      proxyEdgeFunction(request, reply, { functionName: "friends", query: asObject(request.query), body: request.body,
-        method: request.method as "GET" | "POST" }) });
-  }
 };
-
-function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-}

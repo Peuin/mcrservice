@@ -3,7 +3,6 @@ import type { ApiResult } from "../../shared/api-result.js";
 import { inboxQuerySchema, notificationParamsSchema, pushTokenSchema, unregisterPushTokenSchema } from "./schemas.js";
 import {
   deleteNotification,
-  handleLegacyNotificationsRequest,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -47,22 +46,4 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
     const parsed = unregisterPushTokenSchema.safeParse(request.body);
     return parsed.success ? send(reply, await unregisterPushToken(request, parsed.data)) : invalid(reply, parsed.error.flatten());
   });
-
-  app.route({
-    method: ["GET", "POST"],
-    url: "/notifications",
-    schema: { hide: true },
-    handler: async (request, reply) =>
-      send(
-        reply,
-        await handleLegacyNotificationsRequest(request, {
-          query: asObject(request.query),
-          body: request.body
-        })
-      )
-  });
 };
-
-function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-}

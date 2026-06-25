@@ -122,7 +122,7 @@ export async function signup(email: string, password: string) {
       throw new SignupError("SIGNUP_FAILED", "Dịch vụ xác thực không trả về người dùng vừa tạo.", 500);
     }
 
-    const { error: profileError } = await admin.from("profiles").upsert({
+    const { error: profileError } = await admin.schema("public").from("profiles").upsert({
       id: userId,
       email: normalizedEmail,
       provider: "email",
@@ -158,6 +158,7 @@ export async function signup(email: string, password: string) {
 async function resolveEmail(identifier: string, locale: Locale) {
   if (identifier.includes("@")) return identifier.toLowerCase();
   const { data, error } = await requireAdmin()
+    .schema("public")
     .from("profiles")
     .select("email")
     .eq("username", identifier.replace(/^@+/, "").toLowerCase())
@@ -277,7 +278,7 @@ export async function completePasswordReset(identifier: string, otpCode: string,
   const admin = requireAdmin();
   const email = await resolveEmail(identifier, locale);
   await assertOtp(email, otpCode, locale, true);
-  const { data, error } = await admin.from("profiles").select("id").ilike("email", email).maybeSingle();
+  const { data, error } = await admin.schema("public").from("profiles").select("id").ilike("email", email).maybeSingle();
   if (error) throw error;
   if (!data?.id) throw new Error(messages[locale].accountNotFound);
   const { error: updateError } = await admin.auth.admin.updateUserById(String(data.id), { password });

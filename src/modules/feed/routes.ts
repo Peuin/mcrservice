@@ -1,13 +1,41 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
-import { proxyEdgeFunction, type EdgeFunctionResult } from "../../shared/edge-function-proxy.js";
-import { commentParamsSchema, createCommentSchema, createPostSchema, feedQuerySchema, postParamsSchema, replyParamsSchema, toggleLoveSchema } from "./schemas.js";
-import { createComment, createPost, createReply, getPost, listCommentReactions, listComments, listFeed, listPostReactions, toggleCommentLove, togglePostLove } from "./service.js";
+import type { HandlerResult } from "../../shared/handler-dispatch.js";
+import {
+  commentParamsSchema,
+  createCommentSchema,
+  createPostSchema,
+  feedQuerySchema,
+  mutualFriendsQuerySchema,
+  postParamsSchema,
+  replyParamsSchema,
+  saveFrameSchema,
+  setDefaultFrameSchema,
+  topicHotQuerySchema,
+  toggleLoveSchema
+} from "./schemas.js";
+import {
+  createComment,
+  createPost,
+  createReply,
+  getPost,
+  getTopicHotStatus,
+  listCommentReactions,
+  listComments,
+  listFeed,
+  listFrames,
+  listMutualFriends,
+  listPostReactions,
+  saveFrame,
+  setDefaultFrame,
+  toggleCommentLove,
+  togglePostLove
+} from "./service.js";
 import { createCommentDocs, createPostDocs, createReplyDocs, getPostDocs, listCommentReactionsDocs, listCommentsDocs, listFeedDocs, listPostReactionsDocs, toggleCommentLoveDocs, togglePostLoveDocs } from "./swagger.js";
 
 function invalid(reply: FastifyReply, error: unknown) {
   return reply.code(400).send({ success: false, code: "VALIDATION_ERROR", message: "Dữ liệu feed không hợp lệ.", details: error });
 }
-function send(reply: FastifyReply, result: EdgeFunctionResult) {
+function send(reply: FastifyReply, result: HandlerResult) {
   return reply.code(result.status).send(result.payload);
 }
 function issues(...results: Array<{ success: boolean; error?: { flatten(): unknown } }>) {
@@ -56,15 +84,21 @@ export const feedRoutes: FastifyPluginAsync = async (app) => {
     return parsed.success ? send(reply, await listCommentReactions(request, parsed.data.commentId)) : invalid(reply, parsed.error.flatten());
   });
 
-  for (const path of ["/home-feed", "/home-feed/*", "/feed/home-feed", "/feed/home-feed/*"]) {
-    app.route({ method: ["GET", "POST"], url: path, schema: { hide: true }, handler: (request, reply) => {
-      const suffix = request.url.split("?")[0]?.split("/home-feed/")[1] ?? "";
-      return proxyEdgeFunction(request, reply, { functionName: "home-feed", functionPath: suffix,
-        query: asObject(request.query), body: request.body, method: request.method as "GET" | "POST" });
-    }});
-  }
+  app.get("/api/v1/feed/friends", { schema: { hide: true } }, async (request, reply) => {
+    const parsed = mutualFriendsQuerySchema.safeParse(request.query);
+    return parsed.success ? send(reply, await listMutualFriends(request, parsed.data)) : invalid(reply, parsed.error.flatten());
+  });
+  app.get("/api/v1/feed/topics/hot", { schema: { hide: true } }, async (request, reply) => {
+    const parsed = topicHotQuerySchema.safeParse(request.query);
+    return parsed.success ? send(reply, await getTopicHotStatus(request, parsed.data)) : invalid(reply, parsed.error.flatten());
+  });
+  app.get("/api/v1/feed/frames", { schema: { hide: true } }, async (request, reply) => send(reply, await listFrames(request)));
+  app.post("/api/v1/feed/frames", { schema: { hide: true } }, async (request, reply) => {
+    const parsed = saveFrameSchema.safeParse(request.body);
+    return parsed.success ? send(reply, await saveFrame(request, parsed.data)) : invalid(reply, parsed.error.flatten());
+  });
+  app.post("/api/v1/feed/frames/default", { schema: { hide: true } }, async (request, reply) => {
+    const parsed = setDefaultFrameSchema.safeParse(request.body);
+    return parsed.success ? send(reply, await setDefaultFrame(request, parsed.data)) : invalid(reply, parsed.error.flatten());
+  });
 };
-
-function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-}

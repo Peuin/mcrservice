@@ -1,17 +1,17 @@
 import type { FastifyRequest } from "fastify";
-import { callEdgeFunction, type EdgeFunctionResult } from "../../shared/edge-function-proxy.js";
+import { callHandler, type HandlerResult } from "../../shared/handler-dispatch.js";
 import type { CreateCommentInput, CreatePostInput, FeedQuery, ToggleLoveInput } from "./schemas.js";
 
 type FeedContext = Pick<FastifyRequest, "method" | "headers" | "id">;
 
-function callFeed(context: FeedContext, functionPath: string, options: {
+function callFeed(context: FeedContext, path: string, options: {
   method?: "GET" | "POST";
   query?: Record<string, unknown>;
   body?: unknown;
-} = {}): Promise<EdgeFunctionResult> {
-  return callEdgeFunction(context, {
-    functionName: "home-feed",
-    functionPath,
+} = {}): Promise<HandlerResult> {
+  return callHandler(context, {
+    name: "home-feed",
+    path,
     method: options.method ?? "GET",
     query: options.query,
     body: options.body
@@ -56,4 +56,24 @@ export function toggleCommentLove(context: FeedContext, commentId: string, input
 
 export function listCommentReactions(context: FeedContext, commentId: string) {
   return callFeed(context, "reactions", { query: { targetType: "comment", targetId: commentId } });
+}
+
+export function listMutualFriends(context: FeedContext, query: Record<string, unknown>) {
+  return callFeed(context, "friends", { query });
+}
+
+export function getTopicHotStatus(context: FeedContext, query: Record<string, unknown>) {
+  return callFeed(context, "topic-hot", { query });
+}
+
+export function listFrames(context: FeedContext) {
+  return callFeed(context, "frames");
+}
+
+export function saveFrame(context: FeedContext, body: Record<string, unknown>) {
+  return callFeed(context, "frames", { method: "POST", body });
+}
+
+export function setDefaultFrame(context: FeedContext, body: Record<string, unknown>) {
+  return callFeed(context, "frames/default", { method: "POST", body });
 }

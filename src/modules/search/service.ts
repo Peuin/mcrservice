@@ -1,19 +1,22 @@
 import type { FastifyRequest } from "fastify";
-import { callEdgeFunction } from "../../shared/edge-function-proxy.js";
+import { callHandler } from "../../shared/handler-dispatch.js";
 import type { DiscoverQuery, RecentQuery, SaveRecentInput, SearchPostsQuery } from "./schemas.js";
 
 type SearchContext = Pick<FastifyRequest, "method" | "headers" | "id">;
 
-function callSearch(context: SearchContext, functionPath: string, options: {
+function callSearch(context: SearchContext, path: string, options: {
   method?: "GET" | "POST" | "DELETE";
   query?: Record<string, unknown>;
   body?: unknown;
   forwardClientAuth?: boolean;
 } = {}) {
-  return callEdgeFunction(context, {
-    functionName: "app-search", functionPath,
-    method: options.method ?? "GET", query: options.query, body: options.body,
-    forwardClientAuth: options.forwardClientAuth,
+  return callHandler(context, {
+    name: "app-search",
+    path,
+    method: options.method ?? "GET",
+    query: options.query,
+    body: options.body,
+    forwardClientAuth: options.forwardClientAuth
   });
 }
 

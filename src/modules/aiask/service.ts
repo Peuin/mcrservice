@@ -1,11 +1,11 @@
 import type { FastifyRequest } from "fastify";
-import { callEdgeFunction } from "../../shared/edge-function-proxy.js";
+import { callHandler } from "../../shared/handler-dispatch.js";
 import type { AskPeuinInput, PersonalityReplyInput, RecommendationFeedbackInput } from "./schemas.js";
 
 type AiAskContext = Pick<FastifyRequest, "method" | "headers" | "id">;
 
 function callAskPeuin(context: AiAskContext, body: Record<string, unknown>) {
-  return callEdgeFunction(context, { functionName: "ask-peuin", method: "POST", body });
+  return callHandler(context, { name: "ask-peuin", method: "POST", body });
 }
 
 export function askPeuin(context: AiAskContext, input: AskPeuinInput) {
@@ -21,9 +21,9 @@ export function saveRecommendationFeedback(context: AiAskContext, input: Recomme
 }
 
 export function generatePersonalityReply(context: AiAskContext, input: PersonalityReplyInput) {
-  return callEdgeFunction(context, { functionName: "personality", method: "POST", body: { action: "generate_reply", ...input } });
+  return callHandler(context, { name: "personality", method: "POST", body: { action: "generate_reply", ...input } });
 }
 
 export function testPersonalityMarkdown(context: AiAskContext) {
-  return callEdgeFunction(context, { functionName: "personality", method: "POST", body: { action: "test_personality_markdown" } });
+  return callHandler(context, { name: "personality", method: "POST", body: { action: "test_personality_markdown" } });
 }

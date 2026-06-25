@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
-import { proxyEdgeFunction, type EdgeFunctionResult } from "../../shared/edge-function-proxy.js";
+import type { HandlerResult } from "../../shared/handler-dispatch.js";
 import { discoverQuerySchema, recentParamsSchema, recentQuerySchema, saveRecentSchema, searchPostsQuerySchema } from "./schemas.js";
 import { clearRecent, deleteRecent, discover, listRecent, saveRecent, searchPosts } from "./service.js";
 import { clearRecentDocs, deleteRecentDocs, discoverDocs, listRecentDocs, saveRecentDocs, searchPostsDocs } from "./swagger.js";
@@ -7,7 +7,7 @@ import { clearRecentDocs, deleteRecentDocs, discoverDocs, listRecentDocs, saveRe
 function invalid(reply: FastifyReply, details: unknown) {
   return reply.code(400).send({ success: false, code: "VALIDATION_ERROR", message: "Dữ liệu tìm kiếm không hợp lệ.", details });
 }
-function send(reply: FastifyReply, result: EdgeFunctionResult) {
+function send(reply: FastifyReply, result: HandlerResult) {
   return reply.code(result.status).send(result.payload);
 }
 
@@ -33,16 +33,4 @@ export const searchRoutes: FastifyPluginAsync = async (app) => {
     return parsed.success ? send(reply, await deleteRecent(request, parsed.data.id)) : invalid(reply, parsed.error.flatten());
   });
   app.delete("/api/v1/search/recent", { schema: clearRecentDocs }, async (request, reply) => send(reply, await clearRecent(request)));
-
-  for (const path of ["/app-search", "/app-search/*", "/search/app-search", "/search/app-search/*"]) {
-    app.route({ method: ["GET", "POST", "DELETE"], url: path, schema: { hide: true }, handler: (request, reply) => {
-      const suffix = request.url.split("?")[0]?.split("/app-search/")[1] ?? "";
-      return proxyEdgeFunction(request, reply, { functionName: "app-search", functionPath: suffix,
-        query: asObject(request.query), body: request.body, method: request.method as "GET" | "POST" | "DELETE" });
-    }});
-  }
 };
-
-function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-}
