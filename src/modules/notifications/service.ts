@@ -3,7 +3,7 @@ import { localizeApiPayload } from "../../shared/api-i18n.js";
 import type { ApiResult } from "../../shared/api-result.js";
 import { errorMessage, stringValue } from "../../shared/helpers.js";
 import { redisSet } from "../../shared/redis.js";
-import { publicStorageUrl } from "../../shared/storage.js";
+import { avatarPublicUrl, publicStorageUrl } from "../../shared/storage.js";
 import { createUserSupabaseClient, requireUser } from "../../shared/supabase-user.js";
 import type { InboxQuery, PushTokenInput, UnregisterPushTokenInput } from "./schemas.js";
 
@@ -74,7 +74,7 @@ export async function listNotifications(context: NotificationContext, query: Inb
     const response = {
       notifications: (Array.isArray(data) ? (data as Json[]) : []).map((row) => ({
         ...row,
-        actor_avatar_url: publicStorageUrl(supabase, "avatars", stringValue(row.actor_avatar_url))
+        actor_avatar_url: avatarPublicUrl(supabase, stringValue(row.actor_avatar_url))
       })),
       unreadCount: Number(unread ?? 0)
     };
