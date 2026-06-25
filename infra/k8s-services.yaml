@@ -26,7 +26,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: mcrservice
-          image: ghcr.io/peuin/mcrservice:5e75b316b2bb94c4a77a2a9693657c77979dacc4-amd64
+          image: ghcr.io/peuin/mcrservice:edd9c1c4ac133a60baa67f58bfe955cdefe85eee-amd64
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
