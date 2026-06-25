@@ -4,6 +4,7 @@ import type { ApiResult } from "../../shared/api-result.js";
 import { errorMessage, stringValue } from "../../shared/helpers.js";
 import { redisGet, redisSet } from "../../shared/redis.js";
 import { avatarPublicUrl, publicStorageUrl } from "../../shared/storage.js";
+import { publicAdmin, requireSupabaseAdmin, socialAdmin } from "../../shared/supabase.js";
 import { requireUserFromAuthorization, resolveViewer } from "../../shared/supabase-user.js";
 import type { ProfileQuery, UpdateProfileInput } from "./schemas.js";
 
@@ -99,11 +100,7 @@ function firstBy(rows: Json[], key: string) {
   return output;
 }
 
-async function mergeFreshFriendshipFields(
-  supabase: Awaited<ReturnType<typeof resolveViewer>>["client"],
-  cached: Json,
-  viewerId: string | null
-) {
+async function mergeFreshFriendshipFields(cached: Json, viewerId: string | null) {
   const profile = cached.profile;
   if (!profile || typeof profile !== "object" || !viewerId) return cached;
 
@@ -111,8 +108,8 @@ async function mergeFreshFriendshipFields(
   const isCurrentUser = booleanValue((profile as Json).is_current_user);
   if (!profileId || isCurrentUser || profileId === viewerId) return cached;
 
-  const { data: statusData, error: statusError } = await supabase
-    .schema("social")
+  const social = socialAdmin();
+  const { data: statusData, error: statusError } = await social
     .rpc("friendship_status", { p_target_user_id: profileId });
   if (statusError || !statusData || typeof statusData !== "object") return cached;
 
@@ -132,7 +129,10 @@ async function fetchProfilePage(
   query: ProfileQuery
 ): Promise<ApiResult> {
   try {
-    const { client: supabase, user: viewer } = await resolveViewer(context.headers.authorization);
+    const { user: viewer } = await resolveViewer(context.headers.authorization);
+    const admin = requireSupabaseAdmin();
+    const publicDb = publicAdmin();
+    const social = socialAdmin();
     const userId = stringValue(query.userId);
     const username = normalizeUsername(query.username);
     const forceRefresh = query.refresh !== undefined;
@@ -145,12 +145,12 @@ async function fetchProfilePage(
     if (!forceRefresh) {
       const cached = await redisGet<Json>(cacheKey);
       if (cached) {
-        return wrap(context, 200, await mergeFreshFriendshipFields(supabase, cached, viewer?.id ?? null));
+        return wrap(context, 200, await mergeFreshFriendshipFields(cached, viewer?.id ?? null));
       }
     }
 
     const targetId = userId || viewer?.id || "";
-    let profileQuery = supabase
+    let profileQuery = publicDb
       .from("profiles")
       .select("id,display_name,username,avatar_url,bio,created_at,podcast_url,show_instagram_badge,show_recent_views,is_private");
 
@@ -190,8 +190,7 @@ async function fetchProfilePage(
 
     const postsData = canSeeDetails
       ? await selectMany(
-          supabase
-            .schema("social")
+          social
             .from("posts")
             .select("id,caption,reaction_count,comment_count,created_at")
             .eq("user_id", profileId)
@@ -202,8 +201,7 @@ async function fetchProfilePage(
 
     let postCount = 0;
     if (canSeeDetails) {
-      const { count, error: postCountError } = await supabase
-        .schema("social")
+      const { count, error: postCountError } = await social
         .from("posts")
         .select("id", { count: "exact", head: true })
         .eq("user_id", profileId);
@@ -219,8 +217,7 @@ async function fetchProfilePage(
     const mediaRows = postIds.length === 0
       ? []
       : await selectMany(
-          supabase
-            .schema("social")
+          social
             .from("post_media")
             .select("post_id,url,sort_order,created_at")
             .in("post_id", postIds)
@@ -233,15 +230,14 @@ async function fetchProfilePage(
       return {
         id: stringValue(post.id),
         caption: stringValue(post.caption),
-        media_url: publicStorageUrl(supabase, "post-media", stringValue(media?.url)),
+        media_url: publicStorageUrl(admin, "post-media", stringValue(media?.url)),
         reaction_count: numberValue(post.reaction_count),
         comment_count: numberValue(post.comment_count),
         created_at: stringValue(post.created_at)
       };
     });
 
-    const { data: friendCountData, error: friendCountError } = await supabase
-      .schema("social")
+    const { data: friendCountData, error: friendCountError } = await social
       .rpc("friend_count", { p_user_id: profileId });
     if (friendCountError) {
       console.warn("friend_count skipped:", friendCountError.message);
@@ -249,8 +245,7 @@ async function fetchProfilePage(
 
     let storyCount = 0;
     if (isCurrentUser) {
-      const { count, error: storyCountError } = await supabase
-        .schema("social")
+      const { count, error: storyCountError } = await social
         .from("stories")
         .select("id", { count: "exact", head: true })
         .eq("user_id", profileId);
@@ -263,8 +258,7 @@ async function fetchProfilePage(
 
     let friendshipStatus: Json = { status: isCurrentUser ? "self" : "none" };
     if (viewer && !isCurrentUser) {
-      const { data: statusData, error: statusError } = await supabase
-        .schema("social")
+      const { data: statusData, error: statusError } = await social
         .rpc("friendship_status", { p_target_user_id: profileId });
       if (statusError) {
         console.warn("friendship_status skipped:", statusError.message);
@@ -280,7 +274,7 @@ async function fetchProfilePage(
         username: stringValue(profile.username),
         bio: stringValue(profile.bio),
         podcast_url: stringValue(profile.podcast_url),
-        avatar_url: avatarFromProfile(supabase, profile, viewer?.user_metadata),
+        avatar_url: avatarFromProfile(admin, profile, viewer?.user_metadata),
         created_at: stringValue(profile.created_at),
         is_current_user: isCurrentUser,
         show_instagram_badge: booleanValue(profile.show_instagram_badge, true),
@@ -316,18 +310,102 @@ export function getProfileById(context: ProfileContext, userId: string, refresh?
   });
 }
 
+export async function syncCurrentUserProfile(context: ProfileContext): Promise<ApiResult> {
+  try {
+    const { user } = await requireUserFromAuthorization(
+      context.headers.authorization,
+      "Bạn cần đăng nhập để đồng bộ hồ sơ."
+    );
+
+    const email = stringValue(user.email).toLowerCase();
+    if (!email) {
+      throw new Error("Google account did not return an email.");
+    }
+
+    const metadata = (user.user_metadata ?? {}) as Json;
+    const displayName = profileDisplayName(null, metadata);
+    const avatarUrl =
+      stringValue(metadata.avatar_url) ||
+      stringValue(metadata.picture);
+
+    const publicDb = publicAdmin();
+    const admin = requireSupabaseAdmin();
+    const { data: existing, error: lookupError } = await publicDb
+      .from("profiles")
+      .select("id,display_name,avatar_url,is_active,deleted_at")
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (lookupError) throw lookupError;
+
+    if (existing) {
+      const existingProfile = existing as Json;
+      const existingId = stringValue(existingProfile.id);
+      const isInactive = existingProfile.is_active === false;
+      const deletedAt = existingProfile.deleted_at;
+      if (isInactive || deletedAt != null) {
+        throw new Error("This account is inactive or deleted.");
+      }
+
+      if (existingId && existingId !== user.id) {
+        return wrap(context, 200, {
+          ok: true,
+          profile: { id: existingId, email, linked: false }
+        });
+      }
+
+      const existingDisplayName = stringValue(existingProfile.display_name);
+      const existingAvatarUrl = stringValue(existingProfile.avatar_url);
+      const { data: updated, error: updateError } = await publicDb
+        .from("profiles")
+        .update({
+          display_name: existingDisplayName || displayName,
+          avatar_url: existingAvatarUrl || avatarUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", user.id)
+        .select("id,email,display_name,avatar_url")
+        .single();
+
+      if (updateError) throw updateError;
+      return wrap(context, 200, { ok: true, profile: updated });
+    }
+
+    const { data: inserted, error: insertError } = await publicDb
+      .from("profiles")
+      .insert({
+        id: user.id,
+        email,
+        display_name: displayName,
+        avatar_url: avatarUrl,
+        provider: "google",
+        updated_at: new Date().toISOString()
+      })
+      .select("id,email,display_name,avatar_url")
+      .single();
+
+    if (insertError) throw insertError;
+    return wrap(context, 200, { ok: true, profile: inserted });
+  } catch (error) {
+    console.error("profile sync error", error);
+    return wrap(context, 400, { error: errorMessage(error, "Có lỗi xảy ra khi đồng bộ hồ sơ.") });
+  }
+}
+
 export async function updateCurrentProfile(
   context: ProfileContext,
   input: UpdateProfileInput
 ): Promise<ApiResult> {
   try {
-    const { client: supabase, user } = await requireUserFromAuthorization(
+    const { user } = await requireUserFromAuthorization(
       context.headers.authorization,
       "Bạn cần đăng nhập để dùng Hồ sơ."
     );
 
+    const publicDb = publicAdmin();
+    const admin = requireSupabaseAdmin();
     const email = stringValue(user.email);
-    const { data, error } = await supabase.from("profiles").upsert({
+    const { data, error } = await publicDb.from("profiles").upsert({
       id: user.id,
       email,
       display_name: input.displayName,
@@ -360,7 +438,7 @@ export async function updateCurrentProfile(
         username: stringValue(profile.username),
         bio: stringValue(profile.bio),
         podcast_url: stringValue(profile.podcast_url),
-        avatar_url: avatarFromProfile(supabase, profile, user.user_metadata),
+        avatar_url: avatarFromProfile(admin, profile, user.user_metadata),
         created_at: stringValue(profile.created_at),
         is_current_user: true,
         show_instagram_badge: booleanValue(profile.show_instagram_badge, true),

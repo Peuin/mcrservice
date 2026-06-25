@@ -3,7 +3,9 @@ import { stringValue } from "./helpers.js";
 
 export const AVATAR_STORAGE_BUCKET = "avata";
 
-export function publicStorageUrl(supabase: SupabaseClient, bucket: string, path: string): string | null {
+type StorageClient = SupabaseClient<any, string, any>;
+
+export function publicStorageUrl(supabase: StorageClient, bucket: string, path: string): string | null {
   const normalized = stringValue(path).trim();
   if (!normalized) return null;
   if (/^https?:\/\//i.test(normalized)) return normalized;
@@ -12,6 +14,6 @@ export function publicStorageUrl(supabase: SupabaseClient, bucket: string, path:
   return data.publicUrl;
 }
 
-export function avatarPublicUrl(supabase: SupabaseClient, path: string): string | null {
+export function avatarPublicUrl(supabase: StorageClient, path: string): string | null {
   return publicStorageUrl(supabase, AVATAR_STORAGE_BUCKET, path);
 }

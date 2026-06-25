@@ -13,6 +13,7 @@ export const getCurrentProfileDocs = { ...docs("Hồ sơ hiện tại hoặc tì
 export const getProfileByIdDocs = { ...docs("Hồ sơ theo user ID"), params: {
   type: "object", required: ["userId"], properties: { userId: { type: "string", format: "uuid" } }
 }, querystring: { type: "object", additionalProperties: false, properties: { refresh } }} as const;
+export const syncProfileDocs = { ...docs("Đồng bộ hồ sơ sau đăng nhập (Google/OAuth)") } as const;
 export const updateProfileDocs = { ...docs("Cập nhật hồ sơ hiện tại"), body: {
   type: "object", additionalProperties: false, required: ["displayName", "username"], properties: {
     displayName: { type: "string", minLength: 1, maxLength: 100 },

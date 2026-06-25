@@ -39,3 +39,13 @@ export function requireSupabaseAdmin() {
   }
   return supabaseAdmin;
 }
+
+/** Service-role client scoped to `public` — bypasses user JWT decode issues on PostgREST. */
+export function publicAdmin() {
+  return requireSupabaseAdmin().schema("public");
+}
+
+/** Service-role client scoped to `social`. */
+export function socialAdmin() {
+  return requireSupabaseAdmin().schema("social");
+}
