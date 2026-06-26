@@ -2,6 +2,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { env } from "../../config/env.js";
+import { createHandlerSupabaseClient } from "../../shared/handler-supabase.js";
 import { readHeader, type PortedRequest } from "../../shared/handler-runtime.js";
 
 type Json = Record<string, unknown>;
@@ -29,16 +30,7 @@ const corsHeaders = {
 
 
 function createRequestClient(request: PortedRequest) {
-  const supabaseUrl = env.SUPABASE_URL;
-  const supabaseAnonKey = env.SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Thiếu cấu hình SUPABASE_URL hoặc SUPABASE_ANON_KEY.");
-  }
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: { Authorization: readHeader(request.headers, "authorization") ?? "" },
-    },
-  });
+  return createHandlerSupabaseClient(request);
 }
 
 async function requireUser(supabase: ReturnType<typeof createRequestClient>) {

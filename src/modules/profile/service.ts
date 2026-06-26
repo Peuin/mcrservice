@@ -329,46 +329,54 @@ export async function syncCurrentUserProfile(context: ProfileContext): Promise<A
       stringValue(metadata.picture);
 
     const publicDb = publicAdmin();
-    const admin = requireSupabaseAdmin();
-    const { data: existing, error: lookupError } = await publicDb
+
+    const { data: ownProfile, error: ownProfileError } = await publicDb
       .from("profiles")
-      .select("id,display_name,avatar_url,is_active,deleted_at")
-      .ilike("email", email)
+      .select("id,email,display_name,avatar_url,is_active,deleted_at")
+      .eq("id", user.id)
       .maybeSingle();
+    if (ownProfileError) throw ownProfileError;
 
-    if (lookupError) throw lookupError;
-
-    if (existing) {
-      const existingProfile = existing as Json;
-      const existingId = stringValue(existingProfile.id);
-      const isInactive = existingProfile.is_active === false;
-      const deletedAt = existingProfile.deleted_at;
-      if (isInactive || deletedAt != null) {
+    if (ownProfile) {
+      const profile = ownProfile as Json;
+      if (profile.is_active === false || profile.deleted_at != null) {
         throw new Error("This account is inactive or deleted.");
       }
 
+      const { data: updated, error: updateError } = await publicDb
+        .from("profiles")
+        .update({
+          email,
+          display_name: stringValue(profile.display_name) || displayName,
+          avatar_url: stringValue(profile.avatar_url) || avatarUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", user.id)
+        .select("id,email,display_name,avatar_url")
+        .single();
+      if (updateError) throw updateError;
+      return wrap(context, 200, { ok: true, profile: updated });
+    }
+
+    const { data: byEmail, error: lookupError } = await publicDb
+      .from("profiles")
+      .select("id,is_active,deleted_at")
+      .ilike("email", email)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+
+    if (byEmail) {
+      const existingProfile = byEmail as Json;
+      const existingId = stringValue(existingProfile.id);
+      if (existingProfile.is_active === false || existingProfile.deleted_at != null) {
+        throw new Error("This account is inactive or deleted.");
+      }
       if (existingId && existingId !== user.id) {
         return wrap(context, 200, {
           ok: true,
           profile: { id: existingId, email, linked: false }
         });
       }
-
-      const existingDisplayName = stringValue(existingProfile.display_name);
-      const existingAvatarUrl = stringValue(existingProfile.avatar_url);
-      const { data: updated, error: updateError } = await publicDb
-        .from("profiles")
-        .update({
-          display_name: existingDisplayName || displayName,
-          avatar_url: existingAvatarUrl || avatarUrl,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", user.id)
-        .select("id,email,display_name,avatar_url")
-        .single();
-
-      if (updateError) throw updateError;
-      return wrap(context, 200, { ok: true, profile: updated });
     }
 
     const { data: inserted, error: insertError } = await publicDb
